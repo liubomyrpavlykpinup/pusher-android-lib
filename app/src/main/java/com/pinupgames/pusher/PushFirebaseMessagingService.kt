@@ -18,7 +18,7 @@ class PushFirebaseMessagingService : FirebaseMessagingService() {
         scope.launch {
             val gadid = MainActivity.fetchGadid(applicationContext)
 
-            FCMInitializer.sendToken(
+            PushService.instance().sendToken(
                 fcmToken = token,
                 gadid = gadid,
                 appPackage = applicationContext.packageName

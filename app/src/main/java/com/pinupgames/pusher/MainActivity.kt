@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -38,19 +39,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-        }
-
         lifecycleScope.launchWhenCreated {
             val gadid = fetchGadid(applicationContext)
+            val service = PushService.instance()
 
-            FCMInitializer.register(
-                gadid = gadid,
-                country = Locale.getDefault().country.toString(),
-                language = Locale.getDefault().language.toString(),
-                appPackage = packageName
-            )
+            withContext(Dispatchers.IO) {
+                val statusCode = service.register(
+                    gadid = gadid,
+                    country = Locale.getDefault().country.toString(),
+                    language = Locale.getDefault().language.toString(),
+                    appPackage = packageName
+                )
+                Log.d(TAG, "onCreate: $statusCode")
+            }
         }
     }
 

@@ -1,12 +1,43 @@
 package com.pinupgames.pusher
 
-import fuel.Fuel
-import fuel.post
-import fuel.put
+import com.google.gson.Gson
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
-object FCMInitializer {
+interface PushService {
+    suspend fun register(
+        gadid: String, country: String, language: String, appPackage: String
+    ): Response
 
-    private const val TAG = "FCMPusher"
+    suspend fun sendToken(fcmToken: String, appPackage: String, gadid: String): Response
+
+    suspend fun sendTag(tag: String, appPackage: String, gadid: String): Response
+
+    suspend fun sendNotification(
+        gadid: String,
+        appPackage: String,
+        title: String,
+        body: String
+    )
+
+    companion object {
+        private const val PUSH_SERVICE_URL = "https://aff-demo-push.herokuapp.com/"
+
+        fun instance(): PushService {
+            val serviceApi = Retrofit.Builder()
+                .baseUrl(PUSH_SERVICE_URL)
+                .addConverterFactory(GsonConverterFactory.create(Gson()))
+                .build()
+                .create(FCMPushServiceApi::class.java)
+
+            return FCMPushService(serviceApi)
+        }
+    }
+}
+
+internal class FCMPushService(
+    private val serviceApi: FCMPushServiceApi
+) : PushService {
 
     /**
      * Register a user with the specific details in the system
@@ -15,26 +46,16 @@ object FCMInitializer {
      * @param country The country of residence for the user.
      * @param language The preferred language of the user.
      * @param appPackage The package name of the application.
-     * @throws FuelError if there is an error in the network request.
+     * @throws HttpException if there is an error in the network request.
      */
-    suspend fun register(
-        gadid: String,
-        country: String,
-        language: String,
-        appPackage: String
-    ): Int {
-        val bodyJson = """
-            {
-                "gadid": "$gadid",
-                "country": "$country",
-                "language": "$language",
-                "appPackage": "$appPackage"
-            }
-        """.trimIndent()
-
-        return Fuel.post(
-            url = "$PUSH_SERVICE_URL/adduser", body = bodyJson
-        ).statusCode
+    override suspend fun register(
+        gadid: String, country: String, language: String, appPackage: String
+    ): Response {
+        return serviceApi.register(
+            requestBody = RegisterRequestBody(
+                gadid = gadid, country = country, language = language, appPackage = appPackage
+            )
+        )
     }
 
     /**
@@ -43,22 +64,16 @@ object FCMInitializer {
      * @param fcmToken The FCM token to send.
      * @param appPackage The package name of the application.
      * @param gadid The unique identifier associated with the device.
-     * @throws FuelError if there was an error sending the request.
+     * @throws HttpException if there was an error sending the request.
      */
-    suspend fun sendToken(fcmToken: String, appPackage: String, gadid: String): Int {
-        val bodyJson = """
-            {
-                "fcmtoken": $fcmToken",
-                "app_package": $appPackage
-            }
-        """.trimIndent()
-
-        return Fuel
-            .put(
-                url = "$PUSH_SERVICE_URL/updatetoken",
-                parameters = listOf("gadid" to gadid),
-                body = bodyJson
-            ).statusCode
+    override suspend fun sendToken(fcmToken: String, appPackage: String, gadid: String): Response {
+        return serviceApi.updateToken(
+            requestBody = UpdateTokenRequestBody(
+                fcmtoken = fcmToken,
+                appPackage = appPackage
+            ),
+            gadid = gadid
+        )
     }
 
     /**
@@ -67,23 +82,40 @@ object FCMInitializer {
      * @param tag The tag to send.
      * @param appPackage The package name of the application.
      * @param gadid The unique identifier associated with the device.
-     * @throws FuelError if there was an error sending the request.
+     * @throws HttpException if there was an error sending the request.
      */
-    suspend fun sendTag(tag: String, appPackage: String, gadid: String): Int {
-        val bodyJson = """
-            {
-                "tag": $tag",
-                "app_package": $appPackage
-            }
-        """.trimIndent()
-
-        return Fuel
-            .put(
-                url = "$PUSH_SERVICE_URL/updatetag",
-                parameters = listOf("gadid" to gadid),
-                body = bodyJson
-            ).statusCode
+    override suspend fun sendTag(tag: String, appPackage: String, gadid: String): Response {
+        return serviceApi.updateTag(
+            updateTagRequestBody = UpdateTagRequestBody(
+                tag = tag,
+                appPackage = appPackage
+            ),
+            gadid = gadid
+        )
     }
 
-    const val PUSH_SERVICE_URL = "https://aff-demo-push.herokuapp.com"
+    /**
+     * Sends a notification to a specific device using the Firebase Cloud Messaging service.
+     *
+     * @param gadid The unique identifier of the device to send the notification to.
+     * @param appPackage The package name of the application receiving the notification.
+     * @param title The title of the notification.
+     * @param body The body content of the notification.
+     * @return The status code indicating the success or failure of the notification request.
+     */
+    override suspend fun sendNotification(
+        gadid: String,
+        appPackage: String,
+        title: String,
+        body: String
+    ) {
+        serviceApi.sendNotification(
+            requestBody = SendNotificationBody(
+                gadid = gadid,
+                appPackage = appPackage,
+                title = title,
+                body = body
+            )
+        )
+    }
 }
